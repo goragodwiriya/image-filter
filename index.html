@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ตัวแก้ไขรูปภาพ</title>
+  <style>
+    body,
+    html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: Arial, sans-serif;
+    }
+
+    #editor-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    #canvas-container {
+      flex-grow: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #imageCanvas {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    #toolbar {
+      background-color: #f0f0f0;
+      padding: 10px;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+    }
+
+    .tool-group {
+      display: flex;
+      align-items: center;
+    }
+
+    .tool-group label {
+      margin-right: 5px;
+    }
+
+    input[type="file"],
+    input[type="range"],
+    select,
+    button {
+      margin: 0 5px;
+    }
+
+    input[type="range"] {
+      width: 100px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="editor-container">
+    <div id="canvas-container">
+      <canvas id="imageCanvas"></canvas>
+    </div>
+    <div id="toolbar">
+      <div class="tool-group">
+        <input type="file" id="imageUpload" accept="image/*">
+      </div>
+      <div class="tool-group">
+        <label for="brightness">ความสว่าง:</label>
+        <input type="range" id="brightness" min="0" max="200" value="100">
+      </div>
+      <div class="tool-group">
+        <label for="contrast">คอนทราสต์:</label>
+        <input type="range" id="contrast" min="0" max="200" value="100">
+      </div>
+      <div class="tool-group">
+        <label for="saturation">ความอิ่มตัว:</label>
+        <input type="range" id="saturation" min="0" max="200" value="100">
+      </div>
+      <div class="tool-group">
+        <label for="filter">ฟิลเตอร์:</label>
+        <select id="filter">
+          <option value="none">ไม่มี</option>
+          <option value="grayscale">ขาวดำ</option>
+          <option value="sepia">เซเปีย</option>
+          <option value="invert">ผกผัน</option>
+        </select>
+      </div>
+      <div class="tool-group">
+        <button id="resetButton">รีเซ็ต</button>
+        <button id="saveButton">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    class ImageEditor {
+      constructor(canvasId) {
+        this.canvas = document.getElementById(canvasId);
+        this.ctx = this.canvas.getContext('2d');
+        this.image = null;
+        this.brightness = 100;
+        this.contrast = 100;
+        this.saturation = 100;
+        this.filter = 'none';
+      }
+
+      loadImage(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+              this.image = img;
+              this.resetCanvas();
+              resolve();
+            };
+            img.onerror = reject;
+            img.src = event.target.result;
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
+      resetCanvas() {
+        const containerWidth = this.canvas.parentElement.clientWidth;
+        const containerHeight = this.canvas.parentElement.clientHeight;
+        const scale = Math.min(containerWidth / this.image.width, containerHeight / this.image.height);
+        this.canvas.width = this.image.width * scale;
+        this.canvas.height = this.image.height * scale;
+        this.applyChanges();
+      }
+
+      applyChanges() {
+        if (!this.image) return;
+
+        this.ctx.filter = `brightness(${this.brightness}%) contrast(${this.contrast}%) saturate(${this.saturation}%)`;
+        if (this.filter !== 'none') {
+          this.ctx.filter += ` ${this.filter}(100%)`;
+        }
+
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.drawImage(this.image, 0, 0, this.canvas.width, this.canvas.height);
+      }
+
+      setBrightness(value) {
+        this.brightness = value;
+        this.applyChanges();
+      }
+
+      setContrast(value) {
+        this.contrast = value;
+        this.applyChanges();
+      }
+
+      setSaturation(value) {
+        this.saturation = value;
+        this.applyChanges();
+      }
+
+      setFilter(value) {
+        this.filter = value;
+        this.applyChanges();
+      }
+
+      reset() {
+        this.brightness = 100;
+        this.contrast = 100;
+        this.saturation = 100;
+        this.filter = 'none';
+        this.applyChanges();
+      }
+
+      save() {
+        const link = document.createElement('a');
+        link.download = 'edited_image.png';
+        link.href = this.canvas.toDataURL();
+        link.click();
+      }
+    }
+
+    const editor = new ImageEditor('imageCanvas');
+
+    document.getElementById('imageUpload').addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        editor.loadImage(e.target.files[0]);
+      }
+    });
+
+    document.getElementById('brightness').addEventListener('input', (e) => {
+      editor.setBrightness(e.target.value);
+    });
+
+    document.getElementById('contrast').addEventListener('input', (e) => {
+      editor.setContrast(e.target.value);
+    });
+
+    document.getElementById('saturation').addEventListener('input', (e) => {
+      editor.setSaturation(e.target.value);
+    });
+
+    document.getElementById('filter').addEventListener('change', (e) => {
+      editor.setFilter(e.target.value);
+    });
+
+    document.getElementById('resetButton').addEventListener('click', () => {
+      editor.reset();
+      document.getElementById('brightness').value = 100;
+      document.getElementById('contrast').value = 100;
+      document.getElementById('saturation').value = 100;
+      document.getElementById('filter').value = 'none';
+    });
+
+    document.getElementById('saveButton').addEventListener('click', () => {
+      editor.save();
+    });
+
+    window.addEventListener('resize', () => {
+      if (editor.image) {
+        editor.resetCanvas();
+      }
+    });
+  </script>
+</body>
+
+</html>
